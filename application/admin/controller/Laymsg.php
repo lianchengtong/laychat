@@ -12,7 +12,7 @@ namespace app\admin\controller;
 
 use app\admin\model\Chatuser;
 
-class Layermsg extends Base
+class Laymsg extends Base
 {
    
     public function index()
