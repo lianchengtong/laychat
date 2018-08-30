@@ -151,7 +151,7 @@ class Layuser extends Base
             'user' => $user->getOneUser($id),
             'group' => config('user_group')
         ]);
-        return $this->fetch();
+        return $this->fetch('useredit');
     }
 
     //删除用户

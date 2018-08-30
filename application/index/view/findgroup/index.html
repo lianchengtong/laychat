@@ -71,7 +71,7 @@
 <script src="/static/admin/js/plugins/layer/layer.min.js"></script>
 <script type="text/javascript">
     //建立WebSocket通讯
-    var socket = new WebSocket('ws://127.0.0.1:7272');
+	var socket = new WebSocket("ws://"+document.domain+":7272");
 
     $(document).ready(function(){
        //搜索群组

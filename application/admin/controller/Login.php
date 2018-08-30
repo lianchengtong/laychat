@@ -38,7 +38,7 @@ class Login extends Controller
         if (!$verify->check($code)) {
             return json(['code' => -4, 'data' => '', 'msg' => '验证码错误']);
         }
-
+		
         $hasUser = db('user')->where('username', $username)->find();
         if(empty($hasUser)){
             return json(['code' => -1, 'data' => '', 'msg' => '管理员不存在']);
