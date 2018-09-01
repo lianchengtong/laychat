@@ -1,10 +1,11 @@
 <?php
+//namespace app\chat;
+
 use \GatewayWorker\Lib\Gateway;
-use \think\Db;
+use think\Db;
 use \Workerman\Worker;
 use app\admin\model\Chatuser;
 use app\admin\model\Groupdetail;
-use think\facade\Session;
 /**
  * 主逻辑
  * 主要是处理 onConnect onMessage onClose 三个方法
@@ -13,10 +14,24 @@ use think\facade\Session;
 class Events
 {
 	
-   public static function onConnect($client_id) 
-   {
+	public static function onWorkerStart($businessWorker)
+    {
+       //echo "WorkerStart\n";
+    }
+	
+    public static function onConnect($client_id) 
+    {
 	   Worker::log("===============".date('Y-m-d H:i', time()).": onConnect=====================:".$client_id);
-   }
+	   Gateway::sendToCurrentClient("Your client_id is $client_id");
+    }
+	
+	public static function onWebSocketConnect($client_id, $data)
+    {
+        //var_export($data);
+        // if (!isset($data['get']['token'])) {
+            // Gateway::closeClient($client_id);
+        // }
+    }
 	
    /**
     * 当客户端发来消息时触发
@@ -24,6 +39,9 @@ class Events
     * @param mixed $message 具体消息
     */
    public static function onMessage($client_id, $data) {
+		global $db;
+		$db = new \Workerman\MySQL\Connection('127.0.0.1',  '3306', 
+				'root', 'root', 'snake');
        $message = json_decode($data, true);
        $message_type = $message['type'];
        switch($message_type) {
@@ -31,17 +49,13 @@ class Events
                // uid
                $uid = $message['id'];
                // 设置session
-               $user = [
+               $_SESSION["user"]  = [
                    'username' => $message['username'],
                    'avatar'   => $message['avatar'],
                    'id'       => $uid,
                    'sign'     => $message['sign']
                ];
-			   Session::set("username", $user['username']);
-			   Session::set("avatar", $user['avatar']);
-			   Session::set("id", $user['id']);
-			   Session::set("sign", $user['sign']);
-               
+			   
 			   // 将当前链接与uid绑定
                Gateway::bindUid($client_id, $uid);
                // 通知当前客户端初始化
@@ -53,10 +67,10 @@ class Events
 
                //查询最近1周有无需要推送的离线信息
                $time = time() - 7 * 3600 * 24;
-               $resMsg =  Db::query('id,fromid,fromname,fromavatar,timeline,content')->from('snake_chatlog')
+               $resMsg =  $db->select('id,fromid,fromname,fromavatar,timeline,content')->from('snake_chatlog')
                    ->where("toid= {$uid} and timeline > {$time} and type = 'friend' and needsend = 1" )
                    ->query();
-               if( !empty( $resMsg ) ){
+               if(!empty($resMsg)){
 
                    foreach( $resMsg as $key=>$vo ){
 
@@ -75,13 +89,13 @@ class Events
                        Gateway::sendToUid( $uid, json_encode($log_message) );
 
                        //设置推送状态为已经推送
-                        Db::query("UPDATE `snake_chatlog` SET `needsend` = '0' WHERE id=" . $vo['id']);
+                       $db->query("UPDATE `snake_chatlog` SET `needsend` = '0' WHERE id=" . $vo['id']);
 
                    }
                }
 
                //查询当前的用户是在哪个分组中,将当前的链接加入该分组
-               $ret = Db::query("select `groupid` from `snake_groupdetail` where `userid` = {$uid} group by `groupid`");
+               $ret = $db->query("select `groupid` from `snake_groupdetail` where `userid` = {$uid} group by `groupid`");
                if(!empty($ret)){
                    foreach( $ret as $key=>$vo ){
                        Gateway::joinGroup($client_id, $vo['groupid']);  //将登录用户加入群组
@@ -197,11 +211,9 @@ class Events
                return;
                break;
            case 'removeMember':
-				Worker::log("===============removeMember=====================");
                //将移除群组的成员的群信息移除，并从讨论组移除
-               $ret = Gateway::getClientIdByUid( $message['data']['uid'] );
-               if( !empty( $ret ) ){
-
+               $ret = Gateway::getClientIdByUid($message['data']['uid']);
+               if(!empty($ret)){
                    Gateway::leaveGroup($ret['0'], $message['data']['id']);
 
                    $del_message = [
@@ -233,13 +245,13 @@ class Events
                // 聊天消息
                $type = $message['data']['to']['type'];
                $to_id = $message['data']['to']['id'];
-               $uid = Session::get('id');
+               $uid =  $_SESSION["user"]['id'];
  
                $chat_message = [
                     'message_type' => 'chatMessage',
                     'data' => [
-                        'username' => Session::get('username'),
-                        'avatar'   => Session::get('avatar'),
+                        'username' => $_SESSION["user"]['username'],
+                        'avatar'   => $_SESSION["user"]['avatar'],
                         'id'       => $type === 'friend' ? $uid : $to_id,
                         'type'     => $type,
                         'content'  => htmlspecialchars($message['data']['mine']['content']),
@@ -250,8 +262,8 @@ class Events
                $param = [
                    'fromid' => $uid,
                    'toid' => $to_id,
-                   'fromname' => Session::get('username'),
-                   'fromavatar' => Session::get('avatar'),
+                   'fromname' => $_SESSION["user"]['username'],
+                   'fromavatar' => $_SESSION["user"]['avatar'],
                    'content' => htmlspecialchars($message['data']['mine']['content']),
                    'timeline' => time(),
                    'needsend' => 0
@@ -264,13 +276,12 @@ class Events
                        if(empty( Gateway::getClientIdByUid($to_id))){
                            $param['needsend'] = 1;  //用户不在线,标记此消息推送
                        }
-                       //$db1->insert('snake_chatlog')->cols( $param )->query();
+                       $db->insert('snake_chatlog')->cols( $param )->query();
                        return Gateway::sendToUid($to_id, json_encode($chat_message));
                    // 群聊
                    case 'group':
-						var_dump($chat_message);
                        $param['type'] = 'group';
-                       //$db1->insert('snake_chatlog')->cols( $param )->query();
+                       $db->insert('snake_chatlog')->cols( $param )->query();
                        return Gateway::sendToGroup($to_id, json_encode($chat_message), $client_id);
                }
                return;
@@ -279,7 +290,7 @@ class Events
            case 'online':
                $status_message = [
                    'message_type' => $message_type,
-                   'id'           => Session::get('id'),
+                   'id'           => $_SESSION["user"]['id'],
                ];
                $_SESSION['online'] = $message_type;
                Gateway::sendToAll(json_encode($status_message));
@@ -300,8 +311,14 @@ class Events
 	   Worker::log("===============".date('Y-m-d H:i', time()).": onClose=====================: ".$client_id);
        $logout_message = [
            'message_type' => 'logout',
-           'id'           => Session::get('id')
+           'id'           => $_SESSION["user"]['id']
        ];
        Gateway::sendToAll(json_encode($logout_message));
    }
+   
+    public static function onWorkerStop($businessWorker)
+    {
+       //echo "WorkerStop\n";
+    }
+
 }
