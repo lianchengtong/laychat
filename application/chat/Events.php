@@ -97,11 +97,46 @@ class Events
                //查询当前的用户是在哪个分组中,将当前的链接加入该分组
                $ret = $db->query("select `groupid` from `snake_groupdetail` where `userid` = {$uid} group by `groupid`");
                if(!empty($ret)){
-                   foreach( $ret as $key=>$vo ){
-                       Gateway::joinGroup($client_id, $vo['groupid']);  //将登录用户加入群组
+                   foreach($ret as $key=>$vo){
+                        Gateway::joinGroup($client_id, $vo['groupid']);  //将登录用户加入群组
+
                    }
+				   //查询当前的用户所在的组中, 是否有最新消息需要推送
+				   foreach ($ret as $key => $vo)
+				   {
+					    $groupMsg =  $db->select('id,fromid, toid, fromname,fromavatar,timeline,content')->from('snake_chatlog')
+									   ->where("toid= {$uid}  and timeline > {$time} and type = 'group' and needsend = 1" )
+									   ->query();
+						
+						// 查询组信息
+						$group = $db->select('id, groupname, avatar, owner_id, owner_name')->from('snake_chatgroup')
+									   ->where("id= {$vo['groupid']}" )
+									   ->query();
+						if(!empty($groupMsg)){
+							foreach($groupMsg as $key => $vol){
+
+							   $log_message = [
+								   'message_type' => 'logMessage',
+								   'data' => [
+									   'username' => $vol['fromname'],
+									   'avatar'   => $vol['fromavatar'],
+									   'id'       => $vo['groupid'],
+									   'type'     => 'group',
+									   'content'  => htmlspecialchars( $vol['content'] ),
+									   'timestamp'=> $vol['timeline'] * 1000,
+								   ]
+							   ];
+							   $clis = Gateway::getClientIdListByGroup($vo['groupid']);
+							   unset($clis[$client_id]);
+							   Gateway::sendToGroup($vo['groupid'], json_encode($log_message), $clis);
+							   
+							   //设置推送状态为已经推送
+							   $db->query("UPDATE `snake_chatlog` SET `needsend` = '0' WHERE id=" . $vol['id']);
+						   }
+						}
+				   }
                }
-               unset( $ret );
+               unset($ret);
                return;
                break;
            case 'addUser' :
@@ -162,7 +197,6 @@ class Events
                return;
                break;
            case 'joinGroup':
-				Worker::log("===============joinGroup=====================");
                //加入群组
                $uid = $message['data']['uid'];
                $ret = Gateway::getClientIdByUid( $uid ); //若在线实时推送
@@ -280,8 +314,28 @@ class Events
                        return Gateway::sendToUid($to_id, json_encode($chat_message));
                    // 群聊
                    case 'group':
-                       $param['type'] = 'group';
-                       $db->insert('snake_chatlog')->cols( $param )->query();
+						//$param['type'] = 'group';
+					   $res = $db->query("select `userid` from `snake_groupdetail` where `groupid` = {$param['toid']}");
+					   if ($res) {
+						   foreach($res as $val)
+						   {
+							   $param = [
+								   'fromid' => $uid,
+								   'toid' => $val['userid'],
+								   'fromname' => $_SESSION["user"]['username'],
+								   'fromavatar' => $_SESSION["user"]['avatar'],
+								   'content' => htmlspecialchars($message['data']['mine']['content']),
+								   'timeline' => time(),
+								   'type' => 'group',
+								   'needsend' => 0,
+							   ];
+							    if(empty( Gateway::getClientIdByUid($val['userid']))){
+								   $param['needsend'] = 1;  //用户不在线,标记此消息推送
+							    }
+								$ret = $db->insert('snake_chatlog')->cols( $param )->query();
+						   } 
+					   }
+					  
                        return Gateway::sendToGroup($to_id, json_encode($chat_message), $client_id);
                }
                return;
