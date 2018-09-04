@@ -195,7 +195,7 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
       ,'<li class="layui-icon layim-tool-find" layim-event="find" title="查找">&#xe61f;</li>'
       ,'{{# } }}'
       ,'{{# if(!d.base.copyright){ }}'
-      ,'<li class="layui-icon layim-tool-about" layim-event="about" title="关于">&#xe60b;</li>'
+      ,'<li class="layui-icon layim-tool-about" layim-event="signOut" title="退出登录">&#xe60b;</li>'
       ,'{{# } }}'
     ,'</ul>'
     ,'<div class="layui-layim-search"><input><label class="layui-icon" layim-event="closeSearch">&#x1007;</label></div>'
@@ -426,6 +426,52 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
       layer.closeAll('tips');
     };
     
+	//自定义好友右键菜单
+    layimMain.find('.layim-list-friend').on('contextmenu', 'li', function(e){
+	  var othis = $(this);
+	  var html = '<ul data-id="'+ othis[0].id +'" data-index="'+ othis.data('index') +'"><li layim-event="menuHistory" data-type="one">添加分组</li><li layim-event="menuHistory" data-type="all">重命名</li><li layim-event="menuHistory" data-type="all">删除该组</li></ul>';
+	  
+	  if(othis.hasClass('layim-null')) return;
+	  
+	  layer.tips(html, this, {
+		tips: 1
+		,time: 0
+		,anim: 5
+		,fixed: true
+		,skin: 'layui-box layui-layim-contextmenu'
+		,success: function(layero){
+		  var stopmp = function(e){ stope(e); };
+		  layero.off('mousedown', stopmp).on('mousedown', stopmp);
+		}
+	  });
+	  $(document).off('mousedown', hide).on('mousedown', hide);
+	  $(window).off('resize', hide).on('resize', hide);
+	  
+	});
+	
+	//自定义群组右键菜单
+    layimMain.find('.layim-list-group').on('contextmenu', 'li', function(e){
+	  var othis = $(this);
+	  var html = '<ul data-id="'+ othis[0].id +'" data-index="'+ othis.data('index') +'"><li layim-event="menuHistory" data-type="one">发送消息</li><li layim-event="menuHistory" data-type="all">退出该群</li></ul>';
+	  
+	  if(othis.hasClass('layim-null')) return;
+	  
+	  layer.tips(html, this, {
+		tips: 1
+		,time: 0
+		,anim: 5
+		,fixed: true
+		,skin: 'layui-box layui-layim-contextmenu'
+		,success: function(layero){
+		  var stopmp = function(e){ stope(e); };
+		  layero.off('mousedown', stopmp).on('mousedown', stopmp);
+		}
+	  });
+	  $(document).off('mousedown', hide).on('mousedown', hide);
+	  $(window).off('resize', hide).on('resize', hide);
+	  
+	});
+  
     //自定义历史会话右键菜单
     layimMain.find('.layim-list-history').on('contextmenu', 'li', function(e){
       var othis = $(this);
@@ -448,7 +494,9 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
       $(window).off('resize', hide).on('resize', hide);
       
     });
+	
   }
+  
   
   //主面板最小化状态
   var layimClose, popmin = function(content){
@@ -469,7 +517,7 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
       ,anim: 2
       ,offset: 'rb'
       ,resize: false
-      ,content: '<img src="'+ (cache.mine.avatar||(layui.cache.dir+'css/pc/layim/skin/logo.jpg')) +'"><span>'+ (content||cache.base.title||'我的LayIM') +'</span>'
+      ,content: '<img src="'+ (cache.mine.avatar||(layui.cache.dir+'css/pc/layim/skin/logo.jpg')) +'"><span>'+ (content||cache.base.title||'我') +'</span>'
       ,move: '#layui-layim-close img'
       ,success: function(layero, index){
         layimClose = layero;
@@ -1154,7 +1202,7 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
           }
           if(data.length > 0){
             for(var l = 0; l < data.length; l++){
-              html += '<li layim-event="chat" data-type="'+ data[l].type +'" data-index="'+ data[l].index +'" data-list="'+ data[l].list +'"><img src="'+ data[l].avatar +'"><span>'+ (data[l].username || data[l].groupname || '佚名') +'</span><p>'+ (data[l].remark||data[l].sign||'') +'</p></li>';
+              html += '<li layim-event="chat" data-type="'+ data[l].type +'" data-index="'+ data[l].index +'" data-list="'+ data[l].list +'"><img src="'+ data[l].avatar +'"><span>'+ (data[l].username || data[l].groupname || '佚名') +'</span><p>'+ (data[l].remark||data[l].sign|| data[l].oewner_sign ||'') +'</p></li>';
             }
           } else {
             html = '<li class="layim-null">无搜索结果</li>';
@@ -1210,11 +1258,18 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
     }
     
     //关于
-    ,about: function(){
-      layer.alert('版本： '+ v + '<br>版权所有：<a href="http://layim.layui.com" target="_blank">layim.layui.com</a>', {
-        title: '关于 LayIM'
-        ,shade: false
-      });
+    ,signOut: function(){
+        $.ajax({
+            type: "GET",
+            url: "http://im.newpictrue.com/index/login/logout",
+            data: {},
+            dataType: "json",
+            success: function(data){
+              if (data.code == 1) {
+                window.location.href = data.data.url;
+              }
+            }
+        });
     }
     
     //生成换肤
@@ -1295,7 +1350,7 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
             });
             post(members, function(res){
               layui.each(res.list, function(index, item){
-                li += '<li><a><img src="'+ item.avatar +'"></a><p>'+ item.username +'</p></li>';
+                li += '<li id="layim-friend'+item.id+'" layim-event="chat" data-type="friend"><a><img src="'+ item.avatar +'"></a><p>'+ item.username +'</p></li>';
               });
               layero.find('.layim-members-list').html(li);
               layui.each(call.members, function(index, item){
