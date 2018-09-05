@@ -429,7 +429,7 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
 	//自定义好友右键菜单
     layimMain.find('.layim-list-friend').on('contextmenu', 'li', function(e){
 	  var othis = $(this);
-	  var html = '<ul data-id="'+ othis[0].id +'" data-index="'+ othis.data('index') +'"><li layim-event="menuHistory" data-type="one">添加分组</li><li layim-event="menuHistory" data-type="all">重命名</li><li layim-event="menuHistory" data-type="all">删除该组</li></ul>';
+	  var html = '<ul data-id="'+ othis[0].id +'" data-index="'+ othis.data('index') +'"><i class="layui-icon layui-icon-add-1"></i><li layim-event="addDiscussionGroup" data-type="one">添加分组</li><li layim-event="renameDiscussion" data-type="all">重命名</li><li layim-event="delDiscussionGroup" data-type="all">删除该组</li></ul>';
 	  
 	  if(othis.hasClass('layim-null')) return;
 	  
@@ -452,7 +452,7 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
 	//自定义群组右键菜单
     layimMain.find('.layim-list-group').on('contextmenu', 'li', function(e){
 	  var othis = $(this);
-	  var html = '<ul data-id="'+ othis[0].id +'" data-index="'+ othis.data('index') +'"><li layim-event="menuHistory" data-type="one">发送消息</li><li layim-event="menuHistory" data-type="all">退出该群</li></ul>';
+	  var html = '<ul data-id="'+ othis[0].id +'" data-index="'+ othis.data('index') +'"><li layim-event="sendMessage" data-type="one">发送消息</li><li layim-event="exitGroup" data-type="all">退出该群</li></ul>';
 	  
 	  if(othis.hasClass('layim-null')) return;
 	  
