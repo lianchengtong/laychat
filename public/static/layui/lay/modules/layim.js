@@ -1259,17 +1259,6 @@ layui.define(['layer', 'laytpl', 'upload'], function(exports){
     
     //关于
     ,signOut: function(){
-        $.ajax({
-            type: "GET",
-            url: "http://im.newpictrue.com/index/login/logout",
-            data: {},
-            dataType: "json",
-            success: function(data){
-              if (data.code == 1) {
-                window.location.href = data.data.url;
-              }
-            }
-        });
     }
     
     //生成换肤
